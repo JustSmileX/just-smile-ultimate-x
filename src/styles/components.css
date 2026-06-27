@@ -1,0 +1,163 @@
+/* Glassmorphism Panel */
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(25px) saturate(200%);
+  -webkit-backdrop-filter: blur(25px) saturate(200%);
+  border: 1px solid var(--glass-border);
+  border-radius: 24px;
+  padding: 60px 40px;
+  width: 100%;
+  max-width: 500px;
+  text-align: center;
+  box-shadow: var(--glass-shadow);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  animation: panelFadeIn 1.8s cubic-bezier(0.16, 1, 0.3, 1) forwards,
+             panelBreath 8s infinite ease-in-out alternate;
+  transform-style: preserve-3d;
+  transform-origin: center center;
+  transition: box-shadow 0.4s ease;
+}
+
+.panel-reflection {
+  position: absolute;
+  top: 0;
+  left: -40%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.03) 50%, transparent 60%);
+  pointer-events: none;
+  animation: reflectionSlide 9s infinite ease-in-out;
+}
+
+/* Futuristic corner borders on the glass panel */
+.glass-panel::before,
+.glass-panel::after {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border-color: var(--accent-blue);
+  border-style: solid;
+  pointer-events: none;
+}
+
+.glass-panel::before {
+  top: 12px;
+  left: 12px;
+  border-width: 1px 0 0 1px;
+}
+
+.glass-panel::after {
+  bottom: 12px;
+  right: 12px;
+  border-width: 0 1px 1px 0;
+}
+
+/* Secondary corner decoration */
+.panel-corner-tr,
+.panel-corner-bl {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border-color: var(--accent-purple);
+  border-style: solid;
+  pointer-events: none;
+}
+
+.panel-corner-tr {
+  top: 12px;
+  right: 12px;
+  border-width: 1px 1px 0 0;
+}
+
+.panel-corner-bl {
+  bottom: 12px;
+  left: 12px;
+  border-width: 0 0 1px 1px;
+}
+
+/* Logo Design */
+.logo-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.logo-main {
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  font-weight: 900;
+  letter-spacing: 0.55em;
+  text-transform: uppercase;
+  background: linear-gradient(135deg, #ffffff 0%, var(--accent-blue) 55%, #ffffff 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  display: flex;
+  gap: 0.4em;
+  line-height: 1.15;
+  animation: logoGlow 5s ease-in-out infinite alternate,
+             logoShimmer 6s linear infinite;
+}
+
+.logo-word {
+  display: inline-block;
+  animation: logoWordEntrance 1.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.logo-word:nth-child(2) {
+  animation-delay: 0.18s;
+}
+
+.logo-sub-text {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.85em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  text-shadow: 0 0 12px var(--logo-glow-dim), 0 0 24px var(--logo-glow-dim);
+  margin-top: 6px;
+  transform: translateX(0.425em); /* balance letter-spacing offset */
+  animation: subtitleEntrance 1.8s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both;
+}
+
+/* Divider */
+.panel-divider {
+  width: 60px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent-blue), var(--accent-purple), transparent);
+  margin: 20px 0;
+  animation: dividerExpand 1.5s cubic-bezier(0.16, 1, 0.3, 1) 0.5s both;
+}
+
+/* Subtitle */
+.subtitle {
+  font-size: 1.1rem;
+  font-weight: 300;
+  letter-spacing: 0.15em;
+  color: var(--text-secondary);
+  text-align: center;
+  margin-top: 12px;
+  text-transform: uppercase;
+  line-height: 1.6;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+}
+
+/* Extra premium touch: Scanning/Laser line effect inside glass panel */
+.laser-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent-blue), transparent);
+  box-shadow: 0 0 8px var(--accent-blue);
+  opacity: 0.4;
+  animation: scan 6s infinite linear;
+  pointer-events: none;
+}
