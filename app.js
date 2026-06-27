@@ -24,9 +24,32 @@ document.addEventListener("DOMContentLoaded", () => {
       <div class="mouse-bloom" id="mouseBloom"></div>
       <div class="app-shell" id="appShell">
         <main class="shell-content" id="shellContent">
-          <div class="content-empty">
-            <div class="content-empty-icon">◈</div>
-            <div class="content-empty-text">Select a section to begin</div>
+          <div class="scanner-container">
+            <div class="glass-panel scanner-panel" id="scannerPanel">
+              <div class="panel-reflection"></div>
+              <div class="laser-line"></div>
+              <div class="panel-corner-tr"></div>
+              <div class="panel-corner-bl"></div>
+              <div class="scanner-icon">◈</div>
+              <h2 class="scanner-title">LOCAL MEDIA SCANNER</h2>
+              <p class="scanner-desc">Select a local directory to scan recursively. Discovered video tracks will be loaded into an active memory library session.</p>
+              <button class="scanner-btn" id="scanBtn">SCAN FOLDER</button>
+              <div class="scanner-status" id="scannerStatus">Status: Idle</div>
+              <div class="scanner-stats" id="scannerStats">
+                <div class="stat-item">
+                  <span class="stat-label">VIDEOS FOUND</span>
+                  <span class="stat-value" id="statVideos">—</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-label">FOLDERS SCANNED</span>
+                  <span class="stat-value" id="statFolders">—</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-label">SCAN TIME</span>
+                  <span class="stat-value" id="statTime">—</span>
+                </div>
+              </div>
+            </div>
           </div>
         </main>
       </div>
@@ -37,6 +60,126 @@ document.addEventListener("DOMContentLoaded", () => {
   const shell = document.getElementById("appShell");
   shell.prepend(createNavbar());
   shell.prepend(createSidebar());
+
+  // ─── Local Scanner Engine (Phase 1) ──────────────────────────────────────
+  const VIDEO_EXTENSIONS = new Set([
+    "mp4", "mkv", "avi", "mov", "webm", "m4v", "ts", "mpg", "mpeg", "flv", "wmv"
+  ]);
+  let videoFiles = [];   // in-memory only — no IndexedDB, no persistence
+
+  const scanBtn       = document.getElementById("scanBtn");
+  const scannerStatus = document.getElementById("scannerStatus");
+  const statVideos    = document.getElementById("statVideos");
+  const statFolders   = document.getElementById("statFolders");
+  const statTime      = document.getElementById("statTime");
+
+  let folderCount = 0;
+
+  async function scanDirectory(dirHandle, relativePath = "") {
+    folderCount++;
+    for await (const entry of dirHandle.values()) {
+      const currentPath = relativePath
+        ? `${relativePath}/${entry.name}`
+        : entry.name;
+      if (entry.kind === "directory") {
+        await scanDirectory(entry, currentPath);
+      } else if (entry.kind === "file") {
+        const ext = entry.name.split(".").pop().toLowerCase();
+        if (VIDEO_EXTENSIONS.has(ext)) {
+          const file = await entry.getFile();
+          videoFiles.push({
+            name:   entry.name,
+            path:   currentPath,
+            size:   file.size,
+            type:   file.type || `video/${ext}`,
+            handle: entry
+          });
+        }
+      }
+    }
+  }
+
+  function printScanResults(elapsedMs) {
+    // Sort alphabetically by full virtual path
+    videoFiles.sort((a, b) => a.path.localeCompare(b.path));
+
+    console.clear();
+    console.log(
+      "%c[JUST SMILE ULTIMATE X]%c  Local Scanner — Phase 1",
+      "color:#00f0ff;font-weight:900;font-size:1.15rem;",
+      "color:#ffffff;font-size:1.05rem;"
+    );
+    console.log(
+      `%c  ${videoFiles.length} video track(s) found | ${folderCount} folder(s) scanned | ${elapsedMs} ms`,
+      "color:#00ff88;font-weight:700;"
+    );
+    console.table(
+      videoFiles.map(f => ({
+        "File Name":    f.name,
+        "Virtual Path": f.path,
+        "Size (MB)":    (f.size / (1024 * 1024)).toFixed(2)
+      }))
+    );
+    console.log("%c  Raw in-memory handles:", "color:#bd00ff;font-weight:700;", videoFiles);
+  }
+
+  function updateStats(elapsedMs) {
+    if (statVideos)  statVideos.textContent  = videoFiles.length;
+    if (statFolders) statFolders.textContent = folderCount;
+    if (statTime)    statTime.textContent    = `${elapsedMs} ms`;
+  }
+
+  if (scanBtn) {
+    scanBtn.addEventListener("click", async () => {
+      if (typeof window.showDirectoryPicker !== "function") {
+        scannerStatus.textContent =
+          "Error: File System Access API not supported. Use Chrome, Edge, or Opera.";
+        return;
+      }
+
+      try {
+        const dirHandle = await window.showDirectoryPicker();
+
+        scanBtn.disabled      = true;
+        scanBtn.style.opacity = "0.5";
+        scanBtn.style.cursor  = "not-allowed";
+        scannerStatus.className   = "scanner-status scanning";
+        scannerStatus.textContent = "Status: Scanning…";
+        if (statVideos)  statVideos.textContent  = "—";
+        if (statFolders) statFolders.textContent = "—";
+        if (statTime)    statTime.textContent    = "—";
+
+        videoFiles  = [];
+        folderCount = 0;
+
+        const t0 = performance.now();
+        await scanDirectory(dirHandle);
+        const elapsedMs = Math.round(performance.now() - t0);
+
+        printScanResults(elapsedMs);
+        updateStats(elapsedMs);
+
+        scannerStatus.className   = "scanner-status success";
+        scannerStatus.textContent =
+          `Success: ${videoFiles.length} video track(s) found. ` +
+          `Check the developer console for details.`;
+      } catch (err) {
+        if (err.name === "AbortError") {
+          scannerStatus.className   = "scanner-status";
+          scannerStatus.textContent = "Status: Scan cancelled.";
+        } else {
+          console.error("[Scanner] Unexpected error:", err);
+          scannerStatus.className   = "scanner-status";
+          scannerStatus.textContent = `Error: ${err.message}`;
+        }
+      } finally {
+        scanBtn.disabled      = false;
+        scanBtn.style.opacity = "";
+        scanBtn.style.cursor  = "";
+      }
+    });
+  }
+  // ─── End Local Scanner Engine ─────────────────────────────────────────────
 
   const canvas = document.getElementById("particleCanvas");
   const bloom = document.getElementById("mouseBloom");

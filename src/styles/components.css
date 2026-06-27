@@ -463,3 +463,144 @@
   text-transform: uppercase;
   color: var(--text-tertiary);
 }
+
+/* ─── Scanner Panel & Button ────────────────────── */
+.scanner-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+}
+
+.scanner-panel {
+  padding: 40px;
+  max-width: 480px;
+  animation: panelFadeIn 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.scanner-icon {
+  font-size: 2.2rem;
+  color: var(--accent-blue);
+  text-shadow: 0 0 15px rgba(0, 240, 255, 0.6);
+  margin-bottom: 16px;
+  animation: clockPulse 2s infinite ease-in-out;
+}
+
+.scanner-title {
+  font-size: 1.3rem;
+  font-weight: 800;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+  background: linear-gradient(135deg, #ffffff 0%, var(--accent-blue) 60%, #ffffff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.scanner-desc {
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  margin-bottom: 24px;
+  letter-spacing: 0.02em;
+}
+
+.scanner-btn {
+  position: relative;
+  background: rgba(0, 240, 255, 0.08);
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  color: var(--text-primary);
+  font-family: var(--font-family);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  padding: 12px 36px;
+  border-radius: 12px;
+  cursor: pointer;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 4px 20px rgba(0, 240, 255, 0.05);
+}
+
+.scanner-btn:hover {
+  background: rgba(0, 240, 255, 0.16);
+  border-color: rgba(0, 240, 255, 0.7);
+  box-shadow: 0 0 25px rgba(0, 240, 255, 0.25);
+  transform: translateY(-2px);
+}
+
+.scanner-btn:active {
+  transform: translateY(0);
+}
+
+.scanner-status {
+  margin-top: 20px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  min-height: 18px;
+  transition: color 0.3s ease;
+}
+
+.scanner-status.scanning {
+  color: var(--accent-blue);
+  text-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
+}
+
+.scanner-status.success {
+  color: #00ff88;
+  text-shadow: 0 0 8px rgba(0, 255, 136, 0.4);
+}
+
+/* ─── Scan Statistics ───────────────────────────── */
+.scanner-stats {
+  display: flex;
+  gap: 0;
+  margin-top: 24px;
+  border-top: 1px solid var(--glass-border);
+  padding-top: 20px;
+  width: 100%;
+}
+
+.stat-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  position: relative;
+}
+
+/* Divider between stat items */
+.stat-item + .stat-item::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 10%;
+  height: 80%;
+  width: 1px;
+  background: linear-gradient(to bottom, transparent, var(--glass-border), transparent);
+}
+
+.stat-label {
+  font-size: 0.5rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.stat-value {
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: var(--accent-blue);
+  text-shadow: 0 0 10px rgba(0, 240, 255, 0.35);
+  font-variant-numeric: tabular-nums;
+  transition: all 0.4s ease;
+}
