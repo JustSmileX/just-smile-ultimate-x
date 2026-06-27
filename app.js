@@ -129,7 +129,125 @@ document.addEventListener("DOMContentLoaded", () => {
     if (statTime)    statTime.textContent    = `${elapsedMs} ms`;
   }
 
-  if (scanBtn) {
+  // ─── Format bytes → human-readable ──────────────────────────────────────
+  function formatSize(bytes) {
+    if (bytes === 0) return "0 B";
+    const units = ["B", "KB", "MB", "GB", "TB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return (bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1) + " " + units[i];
+  }
+
+  // ─── Render library grid ──────────────────────────────────────────────────
+  function renderLibraryGrid() {
+    const content = document.getElementById("shellContent");
+    if (!content) return;
+
+    // Sort alphabetically by filename before rendering
+    videoFiles.sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" })
+    );
+
+    content.innerHTML = `
+      <div class="library-header">
+        <h2 class="library-title">LOCAL LIBRARY</h2>
+        <span class="library-count">${videoFiles.length} TITLES</span>
+        <button class="library-rescan-btn" id="rescanBtn">◈ RESCAN</button>
+      </div>
+      <div class="library-grid" id="libraryGrid"></div>
+    `;
+
+    const grid = document.getElementById("libraryGrid");
+
+    videoFiles.forEach((file, index) => {
+      const ext  = file.name.split(".").pop().toUpperCase();
+      const name = file.name.replace(/\.[^/.]+$/, "");
+      const size = formatSize(file.size);
+
+      const card = document.createElement("div");
+      card.className = "media-card";
+      card.style.animationDelay = `${index * 0.04}s`;
+      card.innerHTML = `
+        <div class="media-card-poster">
+          <div class="poster-placeholder">
+            <div class="poster-icon">
+              <svg class="poster-svg" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                <rect x="2"  y="8"  width="44" height="32" rx="3" ry="3"
+                      fill="none" stroke="currentColor" stroke-width="2"/>
+                <rect x="2"  y="13" width="6"  height="6"
+                      fill="currentColor" opacity="0.7"/>
+                <rect x="2"  y="29" width="6"  height="6"
+                      fill="currentColor" opacity="0.7"/>
+                <rect x="40" y="13" width="6"  height="6"
+                      fill="currentColor" opacity="0.7"/>
+                <rect x="40" y="29" width="6"  height="6"
+                      fill="currentColor" opacity="0.7"/>
+                <line x1="10" y1="8"  x2="10" y2="40"
+                      stroke="currentColor" stroke-width="1.5" opacity="0.4"/>
+                <line x1="38" y1="8"  x2="38" y2="40"
+                      stroke="currentColor" stroke-width="1.5" opacity="0.4"/>
+              </svg>
+            </div>
+            <div class="poster-ext">${ext}</div>
+          </div>
+          <button class="card-play-btn" title="Play (coming soon)">▶</button>
+        </div>
+        <div class="media-card-info">
+          <div class="media-card-name" title="${file.name}">${name}</div>
+          <div class="media-card-meta">
+            <span class="meta-ext">${ext}</span>
+            <span class="meta-size">${size}</span>
+          </div>
+        </div>
+      `;
+      grid.appendChild(card);
+    });
+
+    // Rescan button wires back to the scanner
+    const rescanBtn = document.getElementById("rescanBtn");
+    if (rescanBtn) {
+      rescanBtn.addEventListener("click", () => {
+        content.innerHTML = `
+          <div class="scanner-container">
+            <div class="glass-panel scanner-panel" id="scannerPanel">
+              <div class="panel-reflection"></div>
+              <div class="laser-line"></div>
+              <div class="panel-corner-tr"></div>
+              <div class="panel-corner-bl"></div>
+              <div class="scanner-icon">◈</div>
+              <h2 class="scanner-title">LOCAL MEDIA SCANNER</h2>
+              <p class="scanner-desc">Select a local directory to scan recursively. Discovered video tracks will be loaded into an active memory library session.</p>
+              <button class="scanner-btn" id="scanBtn">SCAN FOLDER</button>
+              <div class="scanner-status" id="scannerStatus">Status: Idle</div>
+              <div class="scanner-stats" id="scannerStats">
+                <div class="stat-item">
+                  <span class="stat-label">VIDEOS FOUND</span>
+                  <span class="stat-value" id="statVideos">—</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-label">FOLDERS SCANNED</span>
+                  <span class="stat-value" id="statFolders">—</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-label">SCAN TIME</span>
+                  <span class="stat-value" id="statTime">—</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+        bindScanner();
+      });
+    }
+  }
+
+  function bindScanner() {
+    const scanBtn       = document.getElementById("scanBtn");
+    const scannerStatus = document.getElementById("scannerStatus");
+    const statVideos    = document.getElementById("statVideos");
+    const statFolders   = document.getElementById("statFolders");
+    const statTime      = document.getElementById("statTime");
+
+    if (!scanBtn) return;
     scanBtn.addEventListener("click", async () => {
       if (typeof window.showDirectoryPicker !== "function") {
         scannerStatus.textContent =
@@ -163,6 +281,10 @@ document.addEventListener("DOMContentLoaded", () => {
         scannerStatus.textContent =
           `Success: ${videoFiles.length} video track(s) found. ` +
           `Check the developer console for details.`;
+
+        // ── Transition to library grid ─────────────────────────────────────
+        setTimeout(() => renderLibraryGrid(), 900);
+
       } catch (err) {
         if (err.name === "AbortError") {
           scannerStatus.className   = "scanner-status";
@@ -179,7 +301,9 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   }
-  // ─── End Local Scanner Engine ─────────────────────────────────────────────
+
+  // Initial bind on page load
+  bindScanner();
 
   const canvas = document.getElementById("particleCanvas");
   const bloom = document.getElementById("mouseBloom");
