@@ -104,3 +104,95 @@
   align-items: center;
   justify-content: center;
 }
+
+/* ─── App Shell Layout ─────────────────────────── */
+.app-shell {
+  position: relative;
+  z-index: 10;
+  width: 100vw;
+  height: 100vh;
+  display: grid;
+  grid-template-columns: var(--sidebar-width) 1fr;
+  grid-template-rows: var(--topnav-height) 1fr;
+  grid-template-areas:
+    "sidebar topnav"
+    "sidebar content";
+  overflow: hidden;
+}
+
+/* ─── Sidebar ───────────────────────────────────── */
+.shell-sidebar {
+  grid-area: sidebar;
+  background: var(--shell-sidebar-bg);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border-right: 1px solid var(--glass-border);
+  display: flex;
+  flex-direction: column;
+  padding: 28px 0 20px;
+  overflow: hidden;
+  animation: sidebarSlideIn 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+  position: relative;
+  z-index: 20;
+}
+
+/* Sidebar inner accent line */
+.shell-sidebar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 1px;
+  height: 100%;
+  background: linear-gradient(to bottom, transparent, var(--accent-blue), var(--accent-purple), transparent);
+  opacity: 0.25;
+  pointer-events: none;
+}
+
+/* ─── Top Navigation ─────────────────────────────── */
+.shell-topnav {
+  grid-area: topnav;
+  background: var(--shell-nav-bg);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border-bottom: 1px solid var(--glass-border);
+  display: flex;
+  align-items: center;
+  padding: 0 28px;
+  gap: 20px;
+  animation: navSlideDown 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+  position: relative;
+  z-index: 20;
+}
+
+/* Top nav bottom accent line */
+.shell-topnav::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(to right, transparent, var(--accent-blue), var(--accent-purple), transparent);
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+/* ─── Main Content Area ──────────────────────────── */
+.shell-content {
+  grid-area: content;
+  background: var(--shell-content-bg);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 32px;
+  position: relative;
+  z-index: 15;
+}
+
+/* Custom scrollbar */
+.shell-content::-webkit-scrollbar { width: 4px; }
+.shell-content::-webkit-scrollbar-track { background: transparent; }
+.shell-content::-webkit-scrollbar-thumb {
+  background: linear-gradient(to bottom, var(--accent-blue), var(--accent-purple));
+  border-radius: 2px;
+}

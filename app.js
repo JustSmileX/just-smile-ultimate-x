@@ -1,3 +1,6 @@
+import { createSidebar } from "./src/ui/sidebar.js";
+import { createNavbar  } from "./src/ui/navbar.js";
+
 document.addEventListener("DOMContentLoaded", () => {
   const app = document.getElementById("app");
 
@@ -19,28 +22,23 @@ document.addEventListener("DOMContentLoaded", () => {
       <div class="light-beam beam-2"></div>
       <canvas id="particleCanvas" class="particle-canvas"></canvas>
       <div class="mouse-bloom" id="mouseBloom"></div>
-      <div class="ui-foreground">
-        <div class="glass-panel" id="glassPanel">
-          <div class="panel-reflection"></div>
-          <div class="laser-line"></div>
-          <div class="panel-corner-tr"></div>
-          <div class="panel-corner-bl"></div>
-          <div class="logo-container">
-            <h1 class="logo-main">
-              <span class="logo-word">JUST</span>
-              <span class="logo-word">SMILE</span>
-            </h1>
-            <div class="logo-sub-text">ULTIMATE X</div>
+      <div class="app-shell" id="appShell">
+        <main class="shell-content" id="shellContent">
+          <div class="content-empty">
+            <div class="content-empty-icon">◈</div>
+            <div class="content-empty-text">Select a section to begin</div>
           </div>
-          <div class="panel-divider"></div>
-          <p class="subtitle">The Future of Offline Entertainment</p>
-        </div>
+        </main>
       </div>
     </div>
   `;
 
+  // Mount components
+  const shell = document.getElementById("appShell");
+  shell.prepend(createNavbar());
+  shell.prepend(createSidebar());
+
   const canvas = document.getElementById("particleCanvas");
-  const panel = document.getElementById("glassPanel");
   const bloom = document.getElementById("mouseBloom");
   const orbLayer = document.getElementById("orbLayer");
   if (!canvas) return;
@@ -50,7 +48,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const mouse = { x: 0, y: 0, lx: 0, ly: 0 };
   const parallax = { x: 0, y: 0 };
-  const tilt = { x: 0, y: 0 };
 
   function calcParticleCount() {
     return Math.min(Math.floor((width * height) / 18000), 120);
@@ -133,16 +130,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const ty = (mouse.y - cy) / cy;
     parallax.x = lerp(parallax.x, tx, 0.04);
     parallax.y = lerp(parallax.y, ty, 0.04);
-    tilt.x = lerp(tilt.x, ty * 8, 0.06);
-    tilt.y = lerp(tilt.y, -tx * 8, 0.06);
 
     if (orbLayer) {
       orbLayer.style.transform =
         `translate(${parallax.x * -22}px, ${parallax.y * -22}px)`;
-    }
-    if (panel) {
-      panel.style.transform =
-        `perspective(1000px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) translateZ(0)`;
     }
   }
 
