@@ -66,6 +66,7 @@ document.addEventListener("DOMContentLoaded", () => {
     "mp4", "mkv", "avi", "mov", "webm", "m4v", "ts", "mpg", "mpeg", "flv", "wmv"
   ]);
   let videoFiles = [];   // in-memory only — no IndexedDB, no persistence
+  const metadataCache = new Map(); // keyed by file.path → { duration, resolution, width, height, mime, lastModified }
 
   const scanBtn       = document.getElementById("scanBtn");
   const scannerStatus = document.getElementById("scannerStatus");
@@ -137,6 +138,100 @@ document.addEventListener("DOMContentLoaded", () => {
     return (bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1) + " " + units[i];
   }
 
+  // ─── Milestone 6 — Native Media Metadata Engine ──────────────────────────
+
+  function formatDuration(secs) {
+    if (!isFinite(secs) || isNaN(secs)) return "--";
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = Math.floor(secs % 60);
+    if (h > 0) {
+      return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+    }
+    return `${m}:${String(s).padStart(2, "0")}`;
+  }
+
+  function formatResolution(w, h) {
+    if (!w || !h) return "Unknown";
+    const RESOLUTION_LABELS = new Map([
+      ["3840x2160", "2160p (4K)"],
+      ["2560x1440", "1440p"],
+      ["1920x1080", "1080p"],
+      ["1280x720",  "720p"],
+      ["854x480",   "480p"],
+    ]);
+    const key = `${w}x${h}`;
+    if (RESOLUTION_LABELS.has(key)) return RESOLUTION_LABELS.get(key);
+    return `${w} × ${h}`;  // fallback: e.g. "1920 × 800"
+  }
+
+  function updateCardMetadata(filePath, duration, resolution) {
+    const card = document.querySelector(
+      `.media-card[data-path="${CSS.escape(filePath)}"]`
+    );
+    if (!card) return;
+    const dEl = card.querySelector(".meta-duration");
+    const rEl = card.querySelector(".meta-resolution");
+    if (dEl) dEl.textContent = `Duration: ${duration}`;
+    if (rEl) rEl.textContent = `Resolution: ${resolution}`;
+  }
+
+  function extractVideoMetadata(file) {
+    return new Promise(async (resolve, reject) => {
+      let objectUrl = null;
+      let video     = null;
+      let timer     = null;
+
+      const cleanup = () => {
+        if (timer)     { clearTimeout(timer); timer = null; }
+        if (video)     {
+          video.onloadedmetadata = null;
+          video.onerror          = null;
+          video.src              = "";
+          video = null;
+        }
+        if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null; }
+      };
+
+      try {
+        const rawFile = await file.handle.getFile();
+        objectUrl     = URL.createObjectURL(rawFile);
+        video         = document.createElement("video");
+        video.preload    = "metadata";
+        video.muted      = true;
+        video.playsInline = true;
+
+        // ── 10-second timeout guard ───────────────────────────────────────
+        timer = setTimeout(() => {
+          cleanup();
+          reject(new Error("Metadata timeout (10 s)"));
+        }, 10_000);
+
+        video.onloadedmetadata = () => {
+          const width        = video.videoWidth;
+          const height       = video.videoHeight;
+          const duration     = formatDuration(video.duration);
+          const resolution   = formatResolution(width, height);
+          const mime         = rawFile.type;
+          const lastModified = rawFile.lastModified;
+          cleanup();
+          resolve({ duration, resolution, width, height, mime, lastModified });
+        };
+
+        video.onerror = () => {
+          cleanup();
+          reject(new Error("Video metadata load error"));
+        };
+
+        video.src = objectUrl;
+
+      } catch (err) {
+        cleanup();
+        reject(err);
+      }
+    });
+  }
+
   // ─── Render library grid ──────────────────────────────────────────────────
   function renderLibraryGrid() {
     const content = document.getElementById("shellContent");
@@ -165,6 +260,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const card = document.createElement("div");
       card.className = "media-card";
+      card.setAttribute("data-path", file.path);
       card.style.animationDelay = `${index * 0.04}s`;
       card.innerHTML = `
         <div class="media-card-poster">
@@ -196,11 +292,41 @@ document.addEventListener("DOMContentLoaded", () => {
           <div class="media-card-meta">
             <span class="meta-ext">${ext}</span>
             <span class="meta-size">${size}</span>
+            <span class="meta-duration">Duration: Loading...</span>
+            <span class="meta-resolution">Resolution: Loading...</span>
           </div>
         </div>
       `;
       grid.appendChild(card);
     });
+
+    // ─── Queue-based metadata loader (4 concurrent workers) ──────────────
+    const queue = [...videoFiles];
+    let qi = 0;
+
+    async function worker() {
+      while (qi < queue.length) {
+        const file = queue[qi++];
+        try {
+          let meta;
+          if (metadataCache.has(file.path)) {
+            meta = metadataCache.get(file.path);         // cache hit — skip extraction
+          } else {
+            meta = await extractVideoMetadata(file);
+            metadataCache.set(file.path, meta);          // store for future RESCAN
+          }
+          updateCardMetadata(file.path, meta.duration, meta.resolution);
+        } catch (err) {
+          // Timeout, decode error, or handle failure — show graceful fallback.
+          // The while-loop continues: remaining files are never blocked.
+          console.warn("[Metadata] Skipped:", file.path, err.message);
+          updateCardMetadata(file.path, "--", "Unknown");
+        }
+      }
+    }
+
+    // Spawn exactly min(4, total) workers — no Promise.allSettled on the library
+    for (let i = 0; i < Math.min(4, queue.length); i++) worker();
 
     // Rescan button wires back to the scanner
     const rescanBtn = document.getElementById("rescanBtn");
