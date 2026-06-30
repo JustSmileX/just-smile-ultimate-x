@@ -70,14 +70,6 @@ document.addEventListener("DOMContentLoaded", () => {
   let currentClosePlayer = null;   // global reference to active player's close/cleanup function
   let swRegistration = null;       // service worker registration handle
   let particlesPaused = false;     // pauses rAF particle loop during playback
-  const PLAYER_FX = {
-    glassBlur:  true,   // player-glass backdrop-filter
-    particles:  true,   // particle rAF loop
-    orbBlur:    false,   // gradient-orb filter:blur(90px)
-    bgBlur:     false,   // glass-panel, media-card, sidebar, topnav backdrop-filter
-    mouseBloom: true,   // #mouseBloom blur + position
-    animations: true    // fog, beams, logo shimmer, reflection, panel breath, clock/scanner pulse
-  };
 
   const scanBtn       = document.getElementById("scanBtn");
   const scannerStatus = document.getElementById("scannerStatus");
@@ -251,20 +243,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const scene = document.getElementById("scene") || document.body;
 
-    // ─── Runtime feature-flag: disable individual GPU effects ──────
-    const pauseRules = [];
-    if (!PLAYER_FX.orbBlur)   pauseRules.push(`.jsux-player-active .gradient-orb { filter: blur(0) !important; }`);
-    if (!PLAYER_FX.bgBlur)    pauseRules.push(`.jsux-player-active .glass-panel, .jsux-player-active .media-card, .jsux-player-active .shell-sidebar, .jsux-player-active .shell-topnav { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }`);
-    if (!PLAYER_FX.mouseBloom) pauseRules.push(`.jsux-player-active #mouseBloom { display: none !important; }`);
-    if (!PLAYER_FX.animations) pauseRules.push(`.jsux-player-active .gradient-orb, .jsux-player-active .fog-layer, .jsux-player-active .light-beam, .jsux-player-active .logo-main, .jsux-player-active .sidebar-brand-logo, .jsux-player-active .topnav-logo-main, .jsux-player-active .library-title, .jsux-player-active .glass-panel, .jsux-player-active .panel-reflection, .jsux-player-active .laser-line, .jsux-player-active .clock-time, .jsux-player-active .scanner-icon { animation-play-state: paused !important; }`);
-    if (pauseRules.length) {
-      const pauseStyle = document.createElement('style');
-      pauseStyle.id = 'jsux-pause-fx';
-      pauseStyle.textContent = pauseRules.join('\n');
-      document.head.appendChild(pauseStyle);
-      scene.classList.add('jsux-player-active');
-    }
-    particlesPaused = !PLAYER_FX.particles;
+    // ─── Pause background GPU effects during video playback ──────
+    const pauseStyle = document.createElement('style');
+    pauseStyle.id = 'jsux-pause-fx';
+    pauseStyle.textContent = `
+      .jsux-player-active .gradient-orb { filter: blur(0) !important; }
+      .jsux-player-active .glass-panel, .jsux-player-active .media-card,
+      .jsux-player-active .shell-sidebar, .jsux-player-active .shell-topnav {
+        backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+      }
+      .jsux-player-active #mouseBloom { display: none !important; }
+      .jsux-player-active .gradient-orb, .jsux-player-active .fog-layer,
+      .jsux-player-active .light-beam, .jsux-player-active .logo-main,
+      .jsux-player-active .sidebar-brand-logo, .jsux-player-active .topnav-logo-main,
+      .jsux-player-active .library-title, .jsux-player-active .glass-panel,
+      .jsux-player-active .panel-reflection, .jsux-player-active .laser-line,
+      .jsux-player-active .clock-time, .jsux-player-active .scanner-icon {
+        animation-play-state: paused !important;
+      }`;
+    document.head.appendChild(pauseStyle);
+    scene.classList.add('jsux-player-active');
+    particlesPaused = true;
 
     const overlay = document.createElement("div");
     overlay.id = "playerOverlay";
@@ -304,8 +303,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const errorEl   = overlay.querySelector(".player-error");
     const video     = overlay.querySelector(".player-video");
 
+    // Replace expensive backdrop-filter with static background
     const glassEl = overlay.querySelector('.player-glass');
-    if (!PLAYER_FX.glassBlur && glassEl) {
+    if (glassEl) {
       glassEl.style.backdropFilter = 'none';
     }
 
