@@ -71,6 +71,60 @@ document.addEventListener("DOMContentLoaded", () => {
   let swRegistration = null;       // service worker registration handle
   let particlesPaused = false;     // pauses rAF particle loop during playback
 
+  // ─── Browser Media Capability Detection (Phase 1) ──────────────────────
+  async function getMediaCapabilities() {
+    if (getMediaCapabilities._cache) return getMediaCapabilities._cache;
+
+    const el = getMediaCapabilities._el || (getMediaCapabilities._el = document.createElement('video'));
+    const p  = m => el.canPlayType(m);
+
+    const caps = {
+      video: {
+        h264: p('video/mp4; codecs="avc1.42E01E"'),
+        h265: p('video/mp4; codecs="hev1.1.6.L120.90"'),
+        vp9:  p('video/webm; codecs="vp9"'),
+        av1:  p('video/mp4; codecs="av01.0.08M.08"')
+      },
+      audio: {
+        aac:   p('audio/mp4; codecs="mp4a.40.2"'),
+        mp3:   p('audio/mpeg'),
+        opus:  p('audio/ogg; codecs="opus"'),
+        vorbis: p('audio/ogg; codecs="vorbis"'),
+        flac:  p('audio/flac'),
+        ac3:   p('audio/mp4; codecs="ac-3"'),
+        eac3:  p('audio/mp4; codecs="ec-3"'),
+        dts:   p('audio/vnd.dts'),
+        truehd: p('audio/truehd')
+      }
+    };
+
+    if (navigator.mediaCapabilities?.decodingInfo) {
+      const checks = [
+        { k: ['video','h264'], v: {video:{contentType:'video/mp4; codecs="avc1.42E01E"', width:1920, height:1080, bitrate:5e6, framerate:30}} },
+        { k: ['video','h265'], v: {video:{contentType:'video/mp4; codecs="hev1.1.6.L120.90"', width:1920, height:1080, bitrate:5e6, framerate:30}} },
+        { k: ['video','vp9'],  v: {video:{contentType:'video/webm; codecs="vp9"', width:1920, height:1080, bitrate:5e6, framerate:30}} },
+        { k: ['video','av1'],  v: {video:{contentType:'video/mp4; codecs="av01.0.08M.08"', width:1920, height:1080, bitrate:5e6, framerate:30}} },
+        { k: ['audio','aac'],  v: {audio:{contentType:'audio/mp4; codecs="mp4a.40.2"', channels:2, samplerate:44100, bitrate:128000}} },
+        { k: ['audio','mp3'],  v: {audio:{contentType:'audio/mpeg', channels:2, samplerate:44100, bitrate:128000}} },
+        { k: ['audio','opus'], v: {audio:{contentType:'audio/ogg; codecs="opus"', channels:2, samplerate:48000, bitrate:128000}} },
+        { k: ['audio','vorbis'],v:{audio:{contentType:'audio/ogg; codecs="vorbis"', channels:2, samplerate:44100, bitrate:128000}} },
+        { k: ['audio','flac'], v: {audio:{contentType:'audio/flac', channels:2, samplerate:44100, bitrate:128000}} },
+        { k: ['audio','ac3'],  v: {audio:{contentType:'audio/mp4; codecs="ac-3"', channels:6, samplerate:48000, bitrate:448000}} },
+        { k: ['audio','eac3'], v: {audio:{contentType:'audio/mp4; codecs="ec-3"', channels:6, samplerate:48000, bitrate:768000}} },
+        { k: ['audio','dts'],  v: {audio:{contentType:'audio/vnd.dts', channels:6, samplerate:48000, bitrate:1509000}} },
+        { k: ['audio','truehd'],v:{audio:{contentType:'audio/truehd', channels:8, samplerate:48000, bitrate:9000000}} },
+      ].map(c => navigator.mediaCapabilities.decodingInfo({ type:'file', ...c.v }).then(r => ({ k:c.k, ok:r.supported })));
+      (await Promise.allSettled(checks)).forEach(r => {
+        if (r.status === 'fulfilled' && !r.value.ok) {
+          caps[r.value.k[0]][r.value.k[1]] = false;
+        }
+      });
+    }
+
+    getMediaCapabilities._cache = caps;
+    return caps;
+  }
+
   const scanBtn       = document.getElementById("scanBtn");
   const scannerStatus = document.getElementById("scannerStatus");
   const statVideos    = document.getElementById("statVideos");
