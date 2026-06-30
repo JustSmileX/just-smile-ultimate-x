@@ -67,6 +67,7 @@ document.addEventListener("DOMContentLoaded", () => {
   ]);
   let videoFiles = [];   // in-memory only — no IndexedDB, no persistence
   const metadataCache = new Map(); // keyed by file.path → { duration, resolution, width, height, mime, lastModified }
+  let currentClosePlayer = null;   // global reference to active player's close/cleanup function
 
   const scanBtn       = document.getElementById("scanBtn");
   const scannerStatus = document.getElementById("scannerStatus");
@@ -232,7 +233,129 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // ─── Render library grid ──────────────────────────────────────────────────
+  // ─── Premium Video Player (Milestone 7) ──────────────────────────────────
+  async function openPlayer(file, triggerBtn) {
+    if (typeof currentClosePlayer === "function") {
+      currentClosePlayer();
+    }
+
+    const scene = document.getElementById("scene") || document.body;
+
+    const overlay = document.createElement("div");
+    overlay.id = "playerOverlay";
+    overlay.className = "player-overlay";
+    overlay.innerHTML = `
+      <div class="player-glass"></div>
+      <div class="player-container">
+        <button class="player-close-btn" aria-label="Close Player">&#x2715;</button>
+        <div class="player-loading">
+          <div class="player-spinner"></div>
+          <span>Loading Video...</span>
+        </div>
+        <div class="player-error" style="display: none;">
+          <div class="player-error-icon">
+            <svg viewBox="0 0 24 24" width="48" height="48" fill="none"
+                 xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M12 3L22 21H2L12 3Z"
+                    stroke="currentColor" stroke-width="1.8"
+                    stroke-linejoin="round" fill="none"/>
+              <line x1="12" y1="10" x2="12" y2="15"
+                    stroke="currentColor" stroke-width="1.8"
+                    stroke-linecap="round"/>
+              <circle cx="12" cy="18.5" r="1"
+                      fill="currentColor"/>
+            </svg>
+          </div>
+          <span class="player-error-msg">Failed to load video track.</span>
+        </div>
+        <video class="player-video" style="display: none;"></video>
+      </div>
+    `;
+
+    scene.appendChild(overlay);
+
+    const closeBtn  = overlay.querySelector(".player-close-btn");
+    const loadingEl = overlay.querySelector(".player-loading");
+    const errorEl   = overlay.querySelector(".player-error");
+    const video     = overlay.querySelector(".player-video");
+
+    let objectUrl   = null;
+    let isCleanedUp = false;
+
+    // Prevent body scroll
+    document.body.style.overflow = "hidden";
+
+    const cleanup = (forceRemove = true) => {
+      if (isCleanedUp) return;
+      if (video) {
+        try {
+          video.pause();
+          video.currentTime = 0;
+        } catch (e) {
+          console.warn("Video cleanup pause failed:", e);
+        }
+        video.src = "";
+      }
+      if (forceRemove) {
+        isCleanedUp = true;
+        overlay.remove();
+        document.body.style.overflow = ""; // Restore body scroll
+        window.removeEventListener("keydown", handleKeyDown);
+        window.removeEventListener("pagehide", handleUnload);
+        if (currentClosePlayer === cleanup) currentClosePlayer = null;
+        if (triggerBtn) triggerBtn.focus();
+        if (objectUrl) {
+          URL.revokeObjectURL(objectUrl);
+          objectUrl = null;
+        }
+      }
+    };
+
+    currentClosePlayer = cleanup;
+
+    const handleKeyDown = (e) => { if (e.key === "Escape") cleanup(); };
+    const handleUnload  = () => cleanup();
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("pagehide", handleUnload);
+
+    closeBtn.addEventListener("click", () => cleanup(true));
+    overlay.querySelector(".player-glass").addEventListener("click", () => cleanup(true));
+
+    closeBtn.focus();
+
+    try {
+      const rawFile = await file.handle.getFile();
+      objectUrl     = URL.createObjectURL(rawFile);
+
+      video.preload  = "metadata";
+      video.controls = true;
+      video.src      = objectUrl;
+
+      video.oncanplay = () => {
+        if (isCleanedUp) return;
+        loadingEl.style.display = "none";
+        video.style.display     = "block";
+        video.play().catch(err => {
+          console.warn("Video autoplay failed:", err);
+        });
+      };
+
+      video.onerror = () => {
+        if (isCleanedUp) return;
+        loadingEl.style.display = "none";
+        errorEl.style.display   = "flex";
+        cleanup(false);
+      };
+    } catch (err) {
+      if (isCleanedUp) return;
+      loadingEl.style.display = "none";
+      errorEl.style.display   = "flex";
+      cleanup(false);
+    }
+  }
+
+    // ─── Render library grid ──────────────────────────────────────────────────
   function renderLibraryGrid() {
     const content = document.getElementById("shellContent");
     if (!content) return;
@@ -297,6 +420,12 @@ document.addEventListener("DOMContentLoaded", () => {
           </div>
         </div>
       `;
+
+      const playBtn = card.querySelector(".card-play-btn");
+      if (playBtn) {
+        playBtn.title = "Play Video";
+        playBtn.addEventListener("click", () => openPlayer(file, playBtn));
+      }
       grid.appendChild(card);
     });
 
