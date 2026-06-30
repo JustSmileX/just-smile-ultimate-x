@@ -68,6 +68,16 @@ document.addEventListener("DOMContentLoaded", () => {
   let videoFiles = [];   // in-memory only — no IndexedDB, no persistence
   const metadataCache = new Map(); // keyed by file.path → { duration, resolution, width, height, mime, lastModified }
   let currentClosePlayer = null;   // global reference to active player's close/cleanup function
+  let swRegistration = null;       // service worker registration handle
+  let particlesPaused = false;     // pauses rAF particle loop during playback
+  const PLAYER_FX = {
+    glassBlur:  true,   // player-glass backdrop-filter
+    particles:  true,   // particle rAF loop
+    orbBlur:    false,   // gradient-orb filter:blur(90px)
+    bgBlur:     false,   // glass-panel, media-card, sidebar, topnav backdrop-filter
+    mouseBloom: true,   // #mouseBloom blur + position
+    animations: true    // fog, beams, logo shimmer, reflection, panel breath, clock/scanner pulse
+  };
 
   const scanBtn       = document.getElementById("scanBtn");
   const scannerStatus = document.getElementById("scannerStatus");
@@ -241,6 +251,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const scene = document.getElementById("scene") || document.body;
 
+    // ─── Runtime feature-flag: disable individual GPU effects ──────
+    const pauseRules = [];
+    if (!PLAYER_FX.orbBlur)   pauseRules.push(`.jsux-player-active .gradient-orb { filter: blur(0) !important; }`);
+    if (!PLAYER_FX.bgBlur)    pauseRules.push(`.jsux-player-active .glass-panel, .jsux-player-active .media-card, .jsux-player-active .shell-sidebar, .jsux-player-active .shell-topnav { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }`);
+    if (!PLAYER_FX.mouseBloom) pauseRules.push(`.jsux-player-active #mouseBloom { display: none !important; }`);
+    if (!PLAYER_FX.animations) pauseRules.push(`.jsux-player-active .gradient-orb, .jsux-player-active .fog-layer, .jsux-player-active .light-beam, .jsux-player-active .logo-main, .jsux-player-active .sidebar-brand-logo, .jsux-player-active .topnav-logo-main, .jsux-player-active .library-title, .jsux-player-active .glass-panel, .jsux-player-active .panel-reflection, .jsux-player-active .laser-line, .jsux-player-active .clock-time, .jsux-player-active .scanner-icon { animation-play-state: paused !important; }`);
+    if (pauseRules.length) {
+      const pauseStyle = document.createElement('style');
+      pauseStyle.id = 'jsux-pause-fx';
+      pauseStyle.textContent = pauseRules.join('\n');
+      document.head.appendChild(pauseStyle);
+      scene.classList.add('jsux-player-active');
+    }
+    particlesPaused = !PLAYER_FX.particles;
+
     const overlay = document.createElement("div");
     overlay.id = "playerOverlay";
     overlay.className = "player-overlay";
@@ -279,15 +304,24 @@ document.addEventListener("DOMContentLoaded", () => {
     const errorEl   = overlay.querySelector(".player-error");
     const video     = overlay.querySelector(".player-video");
 
+    const glassEl = overlay.querySelector('.player-glass');
+    if (!PLAYER_FX.glassBlur && glassEl) {
+      glassEl.style.backdropFilter = 'none';
+    }
+
     let objectUrl   = null;
     let isCleanedUp = false;
+    let diagTimer   = null;
+    const diagEvt   = {};
 
     // Prevent body scroll
     document.body.style.overflow = "hidden";
 
     const cleanup = (forceRemove = true) => {
       if (isCleanedUp) return;
+      if (diagTimer) { clearInterval(diagTimer); diagTimer = null; }
       if (video) {
+        Object.keys(diagEvt).forEach((k) => video.removeEventListener(k, diagEvt[k]));
         try {
           video.pause();
           video.currentTime = 0;
@@ -309,6 +343,15 @@ document.addEventListener("DOMContentLoaded", () => {
           objectUrl = null;
         }
       }
+
+      // Restore background animations
+      {
+        const ps = document.getElementById('jsux-pause-fx');
+        if (ps) ps.remove();
+        scene.classList.remove('jsux-player-active');
+      }
+      particlesPaused = false;
+      if (glassEl) glassEl.style.backdropFilter = '';
     };
 
     currentClosePlayer = cleanup;
@@ -331,6 +374,35 @@ document.addEventListener("DOMContentLoaded", () => {
       video.preload  = "metadata";
       video.controls = true;
       video.src      = objectUrl;
+
+      // ─── Diagnostics: event logging ──────────────────────────────
+      const diagLog = (type) => (e) => {
+        if (isCleanedUp) return;
+        console.log(`[DIAG] ${type}`,
+          `t=${video.currentTime.toFixed(2)}s`,
+          `rs=${video.readyState}`,
+          `ns=${video.networkState}`);
+      };
+      ['play','pause','waiting','stalled','suspend','progress','timeupdate',
+       'seeking','seeked','ended','error'].forEach((ev) => {
+        diagEvt[ev] = diagLog(ev);
+        video.addEventListener(ev, diagEvt[ev]);
+      });
+      diagTimer = setInterval(() => {
+        if (isCleanedUp) { clearInterval(diagTimer); return; }
+        const ranges = [];
+        for (let i = 0; i < video.buffered.length; i++) {
+          ranges.push(
+            `[${video.buffered.start(i).toFixed(2)}–${video.buffered.end(i).toFixed(2)}]`);
+        }
+        console.log(`[DIAG] state`,
+          `t=${video.currentTime.toFixed(2)}s`,
+          `rs=${video.readyState}`,
+          `ns=${video.networkState}`,
+          `buf=${ranges.join(',') || '∅'}`,
+          `paused=${video.paused}`,
+          `ended=${video.ended}`);
+      }, 1000);
 
       video.oncanplay = () => {
         if (isCleanedUp) return;
@@ -560,6 +632,22 @@ document.addEventListener("DOMContentLoaded", () => {
   // Initial bind on page load
   bindScanner();
 
+  // ─── Service Worker Registration (Milestone 1) ──────────────────────
+  async function registerServiceWorker() {
+    if (!('serviceWorker' in navigator)) {
+      return console.warn('[SW] Not supported');
+    }
+    try {
+      swRegistration = await navigator.serviceWorker.register('./sw.js');
+      console.log('[SW] Registered:', swRegistration.scope);
+      await navigator.serviceWorker.ready;
+      console.log('[SW] Ready:', navigator.serviceWorker.controller);
+    } catch (err) {
+      console.error('[SW] Registration failed:', err);
+    }
+  }
+  registerServiceWorker();
+
   const canvas = document.getElementById("particleCanvas");
   const bloom = document.getElementById("mouseBloom");
   const orbLayer = document.getElementById("orbLayer");
@@ -660,11 +748,13 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function animate() {
-    ctx.clearRect(0, 0, width, height);
-    updateParallax();
-    for (let i = 0; i < particles.length; i++) {
-      particles[i].update();
-      particles[i].draw();
+    if (!particlesPaused) {
+      ctx.clearRect(0, 0, width, height);
+      updateParallax();
+      for (let i = 0; i < particles.length; i++) {
+        particles[i].update();
+        particles[i].draw();
+      }
     }
     requestAnimationFrame(animate);
   }
