@@ -1,5 +1,6 @@
 import { createSidebar } from "./src/ui/sidebar.js";
 import { createNavbar  } from "./src/ui/navbar.js";
+import { detectMKVAudioCodec } from "./src/player/mkv-parser.js";
 
 document.addEventListener("DOMContentLoaded", () => {
   const app = document.getElementById("app");
@@ -458,10 +459,20 @@ document.addEventListener("DOMContentLoaded", () => {
           `ended=${video.ended}`);
       }, 1000);
 
-      video.oncanplay = () => {
+      video.oncanplay = async () => {
         if (isCleanedUp) return;
         loadingEl.style.display = "none";
         video.style.display     = "block";
+        if (/\.mkv$/i.test(rawFile.name)) {
+          try {
+            const result = await detectMKVAudioCodec(rawFile);
+            console.group("MKV Analysis");
+            console.log(result);
+            console.groupEnd();
+          } catch (err) {
+            console.error("MKV parser failed:", err);
+          }
+        }
         video.play().catch(err => {
           console.warn("Video autoplay failed:", err);
         });
