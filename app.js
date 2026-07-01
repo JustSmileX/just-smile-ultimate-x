@@ -1,6 +1,7 @@
 import { createSidebar } from "./src/ui/sidebar.js";
 import { createNavbar  } from "./src/ui/navbar.js";
 import { detectMKVAudioCodec } from "./src/player/mkv-parser.js";
+import { showCodecWarning, hideCodecWarning } from "./src/ui/codec-warning.js";
 
 document.addEventListener("DOMContentLoaded", () => {
   const app = document.getElementById("app");
@@ -469,6 +470,14 @@ document.addEventListener("DOMContentLoaded", () => {
             console.group("MKV Analysis");
             console.log(result);
             console.groupEnd();
+            if (result.browserSupported === false && result.audioCodec !== null) {
+              showCodecWarning({
+                codec: result.friendlyName ?? result.audioCodec,
+                message: "Your browser cannot decode this audio codec. Video may play without sound."
+              });
+            } else {
+              hideCodecWarning();
+            }
           } catch (err) {
             console.error("MKV parser failed:", err);
           }
