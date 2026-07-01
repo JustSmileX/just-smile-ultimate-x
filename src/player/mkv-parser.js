@@ -5,6 +5,8 @@
 
 import { findTrackEntries } from "./track-parser.js";
 import { readCodecId } from "./codec-parser.js";
+import { codecIdToBrowserKey } from "./codec-map.js";
+import { isBrowserCodecSupported } from "./browser-support.js";
 
 /**
  * Map of Matroska audio codec IDs to human-readable names.
@@ -98,9 +100,11 @@ export async function detectMKVAudioCodec(file) {
 
     const entries = findTrackEntries(view);
 
-    let audioCodec   = null;
-    let videoCodec   = null;
-    let friendlyName = null;
+    let audioCodec      = null;
+    let videoCodec      = null;
+    let friendlyName    = null;
+    let browserCodec    = null;
+    let browserSupported = false;
 
     for (const entry of entries) {
         const codecId = readCodecId(view, entry.offset);
@@ -112,6 +116,14 @@ export async function detectMKVAudioCodec(file) {
         if (kind === "audio") {
             audioCodec   = codecId;
             friendlyName = MKV_AUDIO_CODECS[codecId] || null;
+            browserCodec = codecIdToBrowserKey(audioCodec);
+            if (browserCodec) {
+                try {
+                    browserSupported = await isBrowserCodecSupported(browserCodec);
+                } catch (_) {
+                    browserSupported = false;
+                }
+            }
             break;
         }
 
@@ -127,8 +139,8 @@ export async function detectMKVAudioCodec(file) {
         audioCodec,
         videoCodec,
         friendlyName,
-        browserCodec:     null,
-        browserSupported: false,
+        browserCodec,
+        browserSupported,
         trackCount:       entries.length,
         audioTracks:      [],
         videoTracks:      [],
