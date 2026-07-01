@@ -933,3 +933,90 @@
   background: #000;
   z-index: 1;
 }
+/* ==========================================================
+   Unsupported Codec Warning
+========================================================== */
+
+.codec-warning{
+    position:fixed;
+    top:24px;
+    right:24px;
+    width:380px;
+    max-width:calc(100vw - 48px);
+
+    z-index:999999;
+
+    background:rgba(12,12,22,.95);
+    backdrop-filter:blur(18px);
+    -webkit-backdrop-filter:blur(18px);
+
+    border:1px solid rgba(255,80,80,.35);
+    border-radius:16px;
+
+    box-shadow:
+        0 12px 40px rgba(0,0,0,.55),
+        0 0 24px rgba(255,70,70,.18);
+
+    animation:codecWarningIn .28s ease;
+}
+
+.codec-warning-content{
+    padding:18px;
+}
+
+.codec-warning-icon{
+    font-size:28px;
+    margin-bottom:10px;
+}
+
+.codec-warning-header{
+    color:#fff;
+    font-size:15px;
+    font-weight:700;
+    margin-bottom:8px;
+}
+
+.codec-warning-codec{
+    color:#00f0ff;
+    font-weight:700;
+    margin-bottom:10px;
+}
+
+.codec-warning-message{
+    color:#cfcfcf;
+    line-height:1.55;
+    font-size:14px;
+}
+
+.codec-warning-close{
+    margin-top:18px;
+
+    padding:8px 16px;
+
+    border:none;
+    border-radius:8px;
+
+    cursor:pointer;
+
+    background:#ff4b4b;
+    color:white;
+    font-weight:600;
+}
+
+.codec-warning-close:hover{
+    filter:brightness(1.15);
+}
+
+@keyframes codecWarningIn{
+
+    from{
+        opacity:0;
+        transform:translateY(-20px);
+    }
+
+    to{
+        opacity:1;
+        transform:none;
+    }
+
+}
